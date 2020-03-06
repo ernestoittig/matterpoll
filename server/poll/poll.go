@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/mattermost/mattermost-server/model"
+	"github.com/mattermost/mattermost-server/v5/model"
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
@@ -30,13 +30,6 @@ type Settings struct {
 	Anonymous       bool
 	Progress        bool
 	PublicAddOption bool
-}
-
-// VotedAnswerResponse stores answers that is created by a user
-type VotedAnswerResponse struct {
-	PollID       string   `json:"poll_id"`
-	UserID       string   `json:"user_id"`
-	VotedAnswers []string `json:"voted_answers"`
 }
 
 // ErrorMessage contains error messsage for a user that can be localized.
@@ -129,8 +122,8 @@ func (p *Poll) UpdateVote(userID string, index int) error {
 	return nil
 }
 
-// GetVotedAnswer collect voted answers by a user and returns it as VotedAnswerResponse
-func (p *Poll) GetVotedAnswer(userID string) (*VotedAnswerResponse, error) {
+// getVotedAnswers collect voted answers by a user and returns it as string array.
+func (p *Poll) getVotedAnswers(userID string) ([]string, error) {
 	if userID == "" {
 		return nil, fmt.Errorf("invalid userID")
 	}
@@ -142,10 +135,20 @@ func (p *Poll) GetVotedAnswer(userID string) (*VotedAnswerResponse, error) {
 			}
 		}
 	}
-	return &VotedAnswerResponse{
-		PollID:       p.ID,
-		UserID:       userID,
-		VotedAnswers: votedAnswer,
+	return votedAnswer, nil
+}
+
+// GetMetadata returns personalized metadata of a poll.
+func (p *Poll) GetMetadata(userID string, permission bool) (*Metadata, error) {
+	answers, err := p.getVotedAnswers(userID)
+	if err != nil {
+		return nil, err
+	}
+	return &Metadata{
+		PollID:          p.ID,
+		UserID:          userID,
+		AdminPermission: permission,
+		VotedAnswers:    answers,
 	}, nil
 }
 
@@ -188,10 +191,4 @@ func (p *Poll) Copy() *Poll {
 		p2.AnswerOptions[i].Voter = o.Voter
 	}
 	return p2
-}
-
-// EncodeToByte returns a VotedAnswerResponse as a byte array
-func (v *VotedAnswerResponse) EncodeToByte() []byte {
-	b, _ := json.Marshal(v)
-	return b
 }
